@@ -1,0 +1,25 @@
+from pyspark.context import SparkContext
+from pyspark.conf import SparkConf
+sc = SparkContext.getOrCreate(SparkConf())
+
+textFile = sc.textFile("hdfs://127.0.0.1:9000/2M.ID.CONTENTS")
+def FirstL (value) :
+    if not value:
+        return None
+    else :
+        return value.substring(0,1)
+def toAlpha (value) :
+	if value.matches("^[0-9a-z]*$"): 
+                    return value
+	else :
+                     return None
+def toLower_puct(x):
+    punc='`!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
+    lowercased_str = x.lower()
+    for ch in punc:
+        lowercased_str = lowercased_str.replace(ch, '')
+    return lowercased_str
+split = 
+textFile.flatMap(lambda line: line.split(" ")).flatMap(lambda x: toLower_puct(x)).map(lambda word : (word,1)).reduceByKey(lambda a, b: a+b)
+result = split.sortByKey(True,1)
+result.saveAsTextFile("/pyspark_output")
