@@ -1,0 +1,175 @@
+1. 파일 정제
+val textFile = sc.textFile("./README.md")
+val splitLine = textFile.flatMap(line => line.split(" ~!@#$%^&*\\(\\)=+\\[\\]\\{\\}\\\\|;:,.<>?/\"\'_-"))
+val split = splitLine.flatMap(line => line.split(" ")).map(word => (word, 1)).reduceByKey(_+_)
+splitLine.saveAsTextFile("output2_")
+
+`~!@#$%^&*()=+[]{}\\|;:,.<>?/\"\'_-
+
+
+val textFile = sc.textFile("./README.md")
+val split = textFile.flatMap(line => line.toLowerCase.split(" "))
+val splitLine = split.flatMap(line => line.split("~!@#$%^&*\\(\\)=+\\[\\]\\{\\}\\\\|;:,.<>?/\"\'_-")).map(word => (word, 1)).reduceByKey(_+_)
+splitLine.saveAsTextFile("output3")
+
+--- 소문자, 공백 제거--
+
+val textFile = sc.textFile("./README.md")
+val split = textFile.flatMap(line => line.toLowerCase.split(" ")).flatMap(line => line.split("~!@#$%^&*\\(\\)=+\\[\\]\\{\\}\\\\|;:,.<>?/\"\'_-"))
+val splitLine = split.map(word => (word, 1)).reduceByKey(_+_).sortByKey().
+splitLine.saveAsTextFile("output3")
+
+
+2. 2M.ID.CONTENTS
+split(line => line.charAt(0)).map(word => (word, 1)). 
+splitLine.sortByKey(true).foreach(println)
+
+
+split에서 공백이 있는 경우 발생
+if split.charAt(0).toString() == "" {
+} 
+
+
+
+val textFile = sc.textFile("/user/ubuntu/2M.ID.CONTENTS")
+val split = textFile.flatMap(line => line.split("`~!@#$%^&*\\(\\)=+\\[\\]\\{\\}\\|;:,.<>?/\"\'_-")).flatMap(line => line.toLowerCase.split(" "))
+
+--- 실패 --
+import scala.java.util.Try
+val k = Try(split.flatMap(line=>line.charAt(0).toString())
+k.map(word=>(word,1)).reduceByKey(_+_).getOrElse("")
+val splitLine = split.flatMap(line => line.charAt(0).toString()).getOrElse("")
+splitLine.map(word => (word, 1)).reduceByKey(_+_)
+val sp = k.map(word => (word, 1)).reduceByKey(_+_)
+k.saveAsTextFile("user/ubuntu/2M_output")
+--- 실패 ---
+
+- StringIndexOutOfBoundsException 처리 [목표]
+val textFile = sc.textFile("/user/ubuntu/2M.ID.CONTENTS")
+val split = textFile.flatMap(line => line.split("`~!@#$%^&*\\(\\)=+\\[\\]\\{\\}\\|;:,.<>?/\"\'_-")).flatMap(line => line.toLowerCase.split(" "))
+val splitLine = split.flatMap {
+line => line.substring(0,1)
+try {
+ Some(line)}
+catch {
+case _: StringIndexOutOfBoundsException => None
+    }
+}
+splitLine.foreach(println)
+val sp = splitLine.map(word => (word,1)).reduceByKey(_+_).sortByKey(true)
+sp = saveAsTextFile("result")
+
+--- 실패 --- 
+문자열 추출 --> 공백인 경우에 exception을 해결해야 함.
+
+val textFile = sc.textFile("/user/ubuntu/2M.ID.CONTENTS")
+val split = textFile.flatMap(line => line.split("`~!@#$%^&*\\(\\)=+\\[\\]\\{\\}\\|;:,.<>?/\"\'_-")).flatMap(line => line.toLowerCase.split(" "))
+
+def FirstL(value: String) : Option[String] = {
+	if(value.isEmpty) None 
+	else Some(value.substring(0,1))
+ }
+def toAlpha (value: String): Option[String] = {
+	if(value.matches("^[0-9a-z]*$")) Some(value) 
+	else None
+}
+
+val splitLine = split.flatMap(line => FirstL(line)).flatMap(line => toAlpha(line)).map(word => (word,1)).reduceByKey(_+_)
+splitLine.sortByKey(true).saveAsTextFile("2M_RESULT2")
+
+--- 성공! --
+RDD -> DF로 변환
+
+val textFile = sc.textFile("/input/2M.ID.CONTENTS")
+def FirstL(value: String) : Option[String] = {
+	if(value.isEmpty) None 
+	else Some(value.substring(0,1))
+ }
+def toAlpha (value: String): Option[String] = {
+	if(value.matches("^[0-9a-z]*$")) Some(value) 
+	else None
+}
+val split = textFile.flatMap(line => line.split("`~!@#$%^&*\\(\\)=+\\[\\]\\{\\}\\|;:,.<>?/\"\'_-")).flatMap(line => line.toLowerCase.split(" ")).flatMap(line => FirstL(line)).flatMap(line => toAlpha(line))
+val splitLine = split.map(word => (word,1)).reduceByKey(_+_).sortByKey(true)
+import org.apache.spark.sql.SQLContext
+val sqlContext = new SQLContext(sc)
+import sqlContext.implicits._
+val df = splitLine.toDF("First_letter", "Number")
+df.printSchema()
+df.show()
+
+성공!
+-- DataSet  만들기 --
+val textFile = sc.textFile("2M.ID.CONTENTS")
+def FirstL(value: String) : Option[String] = {
+	if(value.isEmpty) None 
+	else Some(value.substring(0,1))
+ }
+def toAlpha (value: String): Option[String] = {
+	if(value.matches("^[0-9a-z]*$")) Some(value) 
+	else None
+}
+val split = textFile.flatMap(line => line.split("`~!@#$%^&*\\(\\)=+\\[\\]\\{\\}\\|;:,.<>?/\"\'_-")).flatMap(line => line.toLowerCase.split(" ")).flatMap(line => FirstL(line)).flatMap(line => toAlpha(line))
+val splitLine = split.map(word => (word,1)).reduceByKey(_+_).sortByKey(true)
+import org.apache.spark.sql.SQLContext
+val sqlContext = new SQLContext(sc)
+import sqlContext.implicits._
+val df = splitLine.toDF()
+case class T(First: String, Num: integer)
+val ds = df.as[T]
+ds.show()
+-----
+pyspark 코드
+
+from pyspark.context import SparkContext
+from pyspark.conf import SparkConf
+sc = SparkContext.getOrCreate(SparkConf())
+
+textFile = sc.textFile("/input/2M.ID.CONTENTS")
+def FirstL (value) :
+	if not value: return None
+    	else: return value.substring(0,1)
+def toAlpha (value) :
+	if value.matches("^[0-9a-z]*$"): 
+                    	return value
+	else :
+                     	return None
+def toLower_puct(x):
+	punc='`!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
+    	lowercased_str = x.lower()
+    	for ch in punc:
+     		lowercased_str = lowercased_str.replace(ch, '')
+    	return lowercased_str
+split = textFile.flatMap(lambda line: line.split(" ")).flatMap(lambda x: toLower_puct(x)).map(lambda word : (word,1)).reduceByKey(lambda a, b: a+b)
+result = split.sortByKey(True,1)
+result.saveAsTextFile("/user/ubuntu/pyspark_output")
+-- 2M.ID.CONTENTS를 LOCAL FILE로 옮기기--
+
+from pyspark.context import SparkContext
+from pyspark.conf import SparkConf
+sc = SparkContext.getOrCreate(SparkConf())
+textFile = sc.textFile("/input/2M.ID.CONTENTS")
+>>> def firstL(value):
+...     if not value:
+...             return None
+...     else:
+...             return value.substring(0,1)
+...
+>>> def toAlpha(value):
+...     if value.matches("^[0-9a-z]*$"):
+...             return value
+...     else:
+...             return None
+...
+>>> def toLower_puct(x):
+...     punc='`!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
+...     lowercased_str=x.lower()
+...     for ch in punc:
+...             lowercased_str=lowercased_str.replace(ch,'')
+...     return lowercased_str
+...
+>>> split = textFile.flatMap(lambda line: line.split(" ")).flatMap(lambda x: toLower_puct(x)).map(lambda word : (word,1)).reduceByKey(lambda a, b: a+b)
+>>> result = split.sortByKey(True,1)
+>>> result.saveAsTextFile("/user/ubuntu/pyspark_output")
+
+
